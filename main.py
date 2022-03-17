@@ -1,21 +1,7 @@
 from dataclasses import dataclass
 from typing import List
 import sqlite3
-
-
-class db_connect:
-
-    def __init__(self, filename):
-        self.filename = filename
-
-    def __enter__(self):
-        self.con = sqlite3.connect(self.filename)
-        self.cur = self.con.cursor()
-        return self.cur
-
-    def __exit__(self, exception_type, exception_value, traceback):
-        self.con.commit()
-        self.cur.close()
+from contextlib import contextmanager
 
 
 @dataclass
@@ -24,65 +10,103 @@ class Item:
     name: str
 
 
-class Client:
-    """Wrapper for sqlite"""
+@contextmanager
+def connect_to_db(filename):
+
+    con = sqlite3.connect(filename)
+    cur = con.cursor()
+    try:
+        yield cur
+        con.commit()
+    except Exception as e:
+        print(e)
+    finally:
+        cur.close()
+        con.close()
+
+
+class Sqlite:
 
     __filename = 'items.db'
 
-    def get_object(self, item_id) -> Item:
-        with db_connect(self.__filename) as cur:
+    def select(self, select_query, *args):
+        with connect_to_db(self.__filename) as cur:
+            return cur.execute(select_query, args).fetchall()
 
-            query = 'SELECT id, name FROM items WHERE id = ?'
-            res = cur.execute(query, (item_id,)).fetchone()
-            return Item(*res)
+    def insert(self, insert_query, *args):
+        with connect_to_db(self.__filename) as cur:
+            cur.execute(insert_query, args)
 
-    def list_objects(self) -> List[Item]:
-        with db_connect(self.__filename) as cur:
+    def delete(self, delete_query, *args):
+        with connect_to_db(self.__filename) as cur:
+            cur.execute(delete_query, args)
 
-            query = 'SELECT * FROM items'
-            res = cur.execute(query)
-            return [Item(id, name) for id, name in res.fetchall()]
-
-    def put_object(self, item: Item) -> None:
-        with db_connect(self.__filename) as cur:
-
-            query = 'INSERT INTO items(id, name) VALUES (?, ?)'
-            cur.execute(query, (item.id, item.name))
-
-    def get_filename(self) -> str:
-        return self.__filename
+    # не знаю куда его впихнуть чтобы не манкипатчить
+    def clear_table(self):
+        with connect_to_db(self.__filename) as cur:
+            cur.execute('DELETE FROM items')
 
 
-class CachedClient(Client):
-    """Cached implementation for Client class"""
+class Client:
 
     def __init__(self):
-        self.__cached_objects = {}
-        self.__list_all_called = False
+        self.database = Sqlite()
 
     def get_object(self, item_id) -> Item:
-        if item_id not in self.__cached_objects:
-            res = super().get_object(item_id)
-            self.__cached_objects[item_id] = res
-            return res
-        return self.__cached_objects[item_id]
-
-    def list_objects(self) -> List[Item]:
-        if not self.__list_all_called:
-            self.__list_all_called = True
-            res = super().list_objects()
-            to_cache_dict = {item.id: item for item in res}
-            self.__cached_objects = {**self.__cached_objects, **to_cache_dict}
-            return res
-        return [item for item in self.__cached_objects.values()]
+        select_query = 'SELECT id, name FROM items WHERE id == ?'
+        # [0] is fetchone
+        item = self.database.select(select_query, item_id)[0]
+        return Item(*item)
 
     def put_object(self, item: Item) -> None:
-        try:
-            del self.__cached_objects[item.id]
-        except KeyError:
-            pass
-        finally:
-            return super().put_object(item)
+        insert_query = 'INSERT INTO items VALUES (?, ?)'
+        self.database.insert(insert_query, item.id, item.name)
 
-    def get_cached_values(self):
-        return self.__cached_objects
+    def list_objects(self) -> List[Item]:
+        select_query = 'SELECT * FROM items'
+        items = self.database.select(select_query)
+        return [Item(*it) for it in items]
+
+
+class CachedClient:
+
+    def __init__(self):
+        self.database = Sqlite()
+        self.__cached_data = {}
+        self.__listed = False
+
+    def get_object(self, item_id) -> Item:
+
+        if item_id not in self.__cached_data:
+            select_query = 'SELECT id, name FROM items WHERE id == ?'
+            # [0] is fetchone here
+            item = Item(*self.database.select(select_query, item_id)[0])
+            self.__cached_data[item_id] = item
+            return item
+        else:
+            return self.__cached_data[item_id]
+
+    def put_object(self, item: Item) -> None:
+        insert_query = 'INSERT INTO items VALUES (?, ?)'
+        self.database.insert(insert_query, item.id, item.name)
+
+        if item.id in self.__cached_data:
+            del self.__cached_data[item.id]
+
+    def list_objects(self) -> List[Item]:
+        if not self.__listed:
+            select_query = 'SELECT * FROM items'
+            items = self.database.select(select_query)
+            resp_dict = {it[0]: Item(*it) for it in items}
+            self.__cached_data = {**self.__cached_data, **resp_dict}
+            self.__listed = True
+            return [Item(*it) for it in items]
+        else:
+            return list(self.__cached_data.values())
+
+    def reset_listing(self):
+        self.__listed = False
+
+    def reset_cache(self):
+        self.__cached_data = {}
+        self.reset_listing()
