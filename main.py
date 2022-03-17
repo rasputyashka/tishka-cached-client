@@ -11,7 +11,7 @@ class Item:
 
 
 @contextmanager
-def connect_to_db(filename):
+def connect_to_db(filename: str):
 
     con = sqlite3.connect(filename)
     cur = con.cursor()
@@ -29,15 +29,15 @@ class Sqlite:
 
     __filename = 'items.db'
 
-    def select(self, select_query, *args):
+    def select(self, select_query: str, *args):
         with connect_to_db(self.__filename) as cur:
             return cur.execute(select_query, args).fetchall()
 
-    def insert(self, insert_query, *args):
+    def insert(self, insert_query: str, *args):
         with connect_to_db(self.__filename) as cur:
             cur.execute(insert_query, args)
 
-    def delete(self, delete_query, *args):
+    def delete(self, delete_query: str, *args):
         with connect_to_db(self.__filename) as cur:
             cur.execute(delete_query, args)
 
