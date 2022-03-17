@@ -71,36 +71,27 @@ class Client:
 class CachedClient:
 
     def __init__(self):
-        self.database = Sqlite()
+        self.client = Client()
         self.__cached_data = {}
         self.__listed = False
 
     def get_object(self, item_id) -> Item:
 
         if item_id not in self.__cached_data:
-            select_query = 'SELECT id, name FROM items WHERE id == ?'
-            # [0] is fetchone here
-            item = Item(*self.database.select(select_query, item_id)[0])
-            self.__cached_data[item_id] = item
-            return item
-        else:
-            return self.__cached_data[item_id]
+            self.__cached_data[item_id] = self.client.get_object(item_id)
+        return self.__cached_data[item_id]
 
     def put_object(self, item: Item) -> None:
-        insert_query = 'INSERT INTO items VALUES (?, ?)'
-        self.database.insert(insert_query, item.id, item.name)
-
-        if item.id in self.__cached_data:
-            del self.__cached_data[item.id]
+        self.client.put_object(item)
+        self.__cached_data[item.id] = item
 
     def list_objects(self) -> List[Item]:
         if not self.__listed:
-            select_query = 'SELECT * FROM items'
-            items = self.database.select(select_query)
-            resp_dict = {it[0]: Item(*it) for it in items}
+            items = self.client.list_objects()
+            resp_dict = {item.id: item for item in items}
             self.__cached_data = {**self.__cached_data, **resp_dict}
             self.__listed = True
-            return [Item(*it) for it in items]
+            return items
         else:
             return list(self.__cached_data.values())
 

@@ -13,15 +13,9 @@ def reset():
         client.put_object(Item(i, f'{i}_item'))
     client.reset_cache()
 
-    
-@pytest.mark.usefixtures('reset')
-def test_first_listing():
-    expected = [Item(i, f'{i}_item') for i in range(10)]
-    assert expected == client.list_objects()
-
 
 @pytest.mark.usefixtures('reset')
-def test_second_listing():
+def test_cached_listing():
     expected = [Item(i, f'{i}_item') for i in range(10)]
     assert expected == client.list_objects()
 
@@ -30,6 +24,7 @@ def test_second_listing():
 def test_getting_object():
     expected = [Item(i, f'{i}_item') for i in range(10)]
     assert expected == [client.get_object(i) for i in range(10)]
+
 
 @pytest.mark.usefixtures('reset')
 def test_putting():
