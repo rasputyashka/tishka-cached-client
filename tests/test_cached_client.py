@@ -13,7 +13,7 @@ def reset():
         client.put_object(Item(i, f'{i}_item'))
     client.reset_cache()
 
-
+    
 @pytest.mark.usefixtures('reset')
 def test_first_listing():
     expected = [Item(i, f'{i}_item') for i in range(10)]
