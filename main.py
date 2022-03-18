@@ -31,7 +31,7 @@ class CachedClient:
         self.__listed = False
 
     def get_object(self, item_id) -> Item:
-        if item_id not in self.__cached_objects():
+        if item_id not in self.__cached_objects:
             item = self.client.get_object(item_id)
             self.__cached_objects[item_id] = item
         return self.__cached_objects[item_id]
