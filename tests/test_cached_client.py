@@ -1,38 +1,36 @@
-import pytest
-from main import CachedClient, Item, Sqlite
+from main import CachedClient, Item
 
 
-sqlite = Sqlite()
-client = CachedClient()
+def test_getting_one_object():
+    client = CachedClient()
+    expected = Item(1, '1_item')
+    client.get_object(1)  # caching result
+    result = client.get_cache()[1]
+    assert expected == result
 
 
-@pytest.fixture()
-def reset():
-    sqlite.clear_table()
-    for i in range(10):
-        client.put_object(Item(i, f'{i}_item'))
-    client.reset_cache()
+def test_getting_several_items():
+    client = CachedClient()
+    expected = {1: Item(1, '1_item'), 2: Item(2, '2_item')}
+    client.get_object(1)
+    client.get_object(2)
+    assert expected == client.get_cache()
 
 
-@pytest.mark.usefixtures('reset')
-def test_cached_listing():
-    expected = [Item(i, f'{i}_item') for i in range(10)]
-    assert expected == client.list_objects()
+def test_putting_items():
+    client = CachedClient()
+    expected = {1: Item(1, '1_item'), 2: Item(2, '2_item')}
+    client.get_object(1)
+    client.get_object(2)
+    client.get_object(3)
+    client.put_object(Item(3, '3_item'))
+    assert expected == client.get_cache()
 
 
-@pytest.mark.usefixtures('reset')
-def test_getting_object():
-    expected = [Item(i, f'{i}_item') for i in range(10)]
-    assert expected == [client.get_object(i) for i in range(10)]
-
-
-@pytest.mark.usefixtures('reset')
-def test_putting():
-    expected = Item(123, '123_item')
-    client.put_object(Item(1, '1_item'))
-    client.put_object(Item(123, '123_item'))
-    assert expected == client.get_object(123)
-
-
-def teardown_module(module):
-    sqlite.clear_table()
+def test_listing_items():
+    client = CachedClient()
+    client.list_objects()
+    cache = client.get_cache()
+    for key in cache:
+        client.put_object(cache[key])
+    assert len(client.get_cache()) == 0
