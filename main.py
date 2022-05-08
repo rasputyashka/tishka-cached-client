@@ -1,7 +1,6 @@
 import time
 from dataclasses import dataclass
 from typing import List
-from copy import copy
 
 
 @dataclass
@@ -10,8 +9,19 @@ class Item:
     name: str
 
 
-class Client:
+class ClientInterface:
     def get_object(self, item_id) -> Item:
+        raise NotImplementedError()
+
+    def list_objects(self) -> List[Item]:
+        raise NotImplementedError()
+
+    def put_object(self, item: Item) -> None:
+        raise NotImplementedError()
+
+
+class Client(ClientInterface):
+    def get_object(self, item_id):
         time.sleep(1)
         return Item(item_id, f'{item_id}_item')
 
@@ -23,31 +33,43 @@ class Client:
         time.sleep(1)
 
 
-class CachedClient:
+class ClientWrapper(ClientInterface):
 
-    def __init__(self):
-        self.client = Client()
-        self.__cached_objects = {}
-        self.__listed = False
+    def __init__(self, decoratee):
+        self.decoratee = decoratee
 
     def get_object(self, item_id) -> Item:
-        if item_id not in self.__cached_objects:
-            item = self.client.get_object(item_id)
-            self.__cached_objects[item_id] = item
-        return self.__cached_objects[item_id]
+        return self.decoratee.get_object(item_id)
 
     def list_objects(self) -> List[Item]:
-        if not self.__listed:
-            items = self.client.list_objects()
-            items_dict = {item.id: item for item in items}
-            self.__cached_objects = {**self.__cached_objects, **items_dict}
-        return self.__cached_objects.values()
+        return self.decoratee.list_objects()
 
-    def put_object(self, item: Item) -> None:
+    def put_object(self, item) -> None:
+        return self.decoratee.put_object(item)
 
-        self.client.put_object(item)
-        if item.id in self.__cached_objects:
-            del self.__cached_objects[item.id]
 
-    def get_cache(self):
-        return copy(self.__cached_objects)
+class CachedClient(ClientWrapper):
+
+    def __init__(self, decoratee):
+        self.decoratee = decoratee
+        self.cache = {}
+        self.listed = False
+
+    def get_object(self, item_id):
+        if item_id not in self.cache:
+            self.cache[item_id] = super().get_object(item_id)
+        return self.cache[item_id]
+
+    def list_objects(self):
+        if not self.listed:
+            items = super().list_objects()
+            self.cache.update({item.id: item for item in items})
+        return self.cache.values()
+
+    def put_object(self, item):
+        super().put_object(item)
+        if item.id in self.cache:
+            del self.cache[item.id]
+
+    def get_cache(self) -> dict[int, Item]:
+        return self.cache.copy()
