@@ -33,22 +33,7 @@ class Client(ClientInterface):
         time.sleep(1)
 
 
-class ClientWrapper(ClientInterface):
-
-    def __init__(self, decoratee):
-        self.decoratee = decoratee
-
-    def get_object(self, item_id) -> Item:
-        return self.decoratee.get_object(item_id)
-
-    def list_objects(self) -> List[Item]:
-        return self.decoratee.list_objects()
-
-    def put_object(self, item) -> None:
-        return self.decoratee.put_object(item)
-
-
-class CachedClient(ClientWrapper):
+class CachedClient:
 
     def __init__(self, decoratee):
         self.decoratee = decoratee
@@ -57,17 +42,17 @@ class CachedClient(ClientWrapper):
 
     def get_object(self, item_id):
         if item_id not in self.cache:
-            self.cache[item_id] = super().get_object(item_id)
+            self.cache[item_id] = self.decoratee.get_object(item_id)
         return self.cache[item_id]
 
     def list_objects(self):
         if not self.listed:
-            items = super().list_objects()
+            items = self.decoratee.list_objects()
             self.cache.update({item.id: item for item in items})
-        return self.cache.values()
+        return list(self.cache.values())
 
     def put_object(self, item):
-        super().put_object(item)
+        self.decoratee.put_object(item)
         if item.id in self.cache:
             del self.cache[item.id]
 

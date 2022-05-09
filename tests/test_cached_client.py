@@ -19,26 +19,26 @@ def get_client():
     return cached_client
 
 
+client = get_client()
+client.get_object(1)
+
+
 def test_getting():
-    cached_client = get_client()
-    cached_client.get_object(1)
-    assert cached_client.get_cache()[1] == Item(1, 'item_1')
+    # cached object
+    assert client.get_object(1) == Item(1, 'item_1')
+
+
+client.list_objects()
 
 
 def test_listing():
-    cached_client = get_client()
-    cached_client.list_objects()
+    # got them from the cache
     expected = [Item(item_id, f'item_{item_id}') for item_id in range(1, 10)]
-    cache = cached_client.get_cache()
-    is_passed = True
-    for el in expected:
-        if el not in cache.values():
-            is_passed = False
-    assert is_passed
+    assert client.list_objects() == expected
 
 
 def test_putting():
-    cached_client = get_client()
-    cached_client.get_object(1)
-    cached_client.put_object(Item(1, 'item_1'))
-    assert not cached_client.get_cache()
+    # remove all objects from the cache
+    for item in client.get_cache().values():
+        client.put_object(item)
+    assert not client.get_cache()
