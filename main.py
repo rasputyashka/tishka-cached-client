@@ -47,6 +47,7 @@ class CachedClient:
 
     def list_objects(self):
         if not self.listed:
+            self.listed = True
             items = self.decoratee.list_objects()
             self.cache.update({item.id: item for item in items})
         return list(self.cache.values())
